@@ -45,29 +45,15 @@ simMatrix = (1-differenceMatrix);
 imagesc(simMatrix);
 colormap Hot
 colorbar
-%% 画图
-display = [];
-Points = [];
-for i=1:1237
-    for j=1:1237
-        if differenceMatrix(i,j)<0.30 && abs(i-j)>10
-            display(i,j)=0;
-        else
-            display(i,j)=1;
-        end
-    end
-    
-end
-imagesc(display);
-colormap Hot
-colorbar
+
+
 %% 计算回环
 N = 0; % 节点
 t = 1; % 步数
 imageNum = 1237; % 图像数量
 X = []; % 粒子
 W = []; % 权重
-a = 0.5; % 粒子重新生成系数
+a = 0.2; % 粒子重新生成系数
 X_b = []; % 临时粒子集
 M = 200; % 粒子数
 loop = []; % 回环
@@ -83,14 +69,16 @@ while t < imageNum
             alphabet = [0 1 2 3]; prob = [0.1 0.7 0.1 0.1];
             r = randsrc(1,1,[alphabet; prob]);
             X(i) = X(i) + r;
+            if X(i)>imageNum
+                X(i) = imageNum;
+            end
             W(i) = simMatrix(X(i),t); % 权重为当前所看到的图像和粒子位置图像的相似度
             X_b = [X_b;X(i),W(i)]; % 在重采样前保存粒子位置和权重
         end
-        X = [];
         for i=1:M % 重采样
             alphabet = X_b(:,1)'; prob = W/sum(W);
             x_i = randsrc(1,1,[alphabet; prob]);
-            X = [X,x_i];
+            X(i) = x_i;
         end
         for i=1:ceil(M*a) % 随机重新生成粒子（添加噪声）
             j = unidrnd(N,1); % 随机生成从1到N的离散值
@@ -99,10 +87,28 @@ while t < imageNum
         end
     end
     x_t = mode(X);
-    if abs(x_t - t) > 10
+    if t - x_t > 10 %&& sum(X==x_t)>M/10
         loop = [loop;x_t,t];
     else
         N = N+1;
     end
     t = t+1;
 end
+%% 画图
+plot(loop(:,1),loop(:,2),'.');
+%%
+display = [];
+Points = [];
+for i=1:1237
+    for j=1:1237
+        if differenceMatrix(i,j)<0.30 && abs(i-j)>10
+            display(i,j)=0;
+        else
+            display(i,j)=1;
+        end
+    end
+    
+end
+imagesc(display);
+colormap Hot
+colorbar
