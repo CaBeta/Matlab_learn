@@ -1,0 +1,57 @@
+% city centre CNN 测试
+clear;
+run ../matconvnet-1.0-beta25/matlab/vl_setupnn ; %
+%% 导入模型
+net = load('../imagenet-vgg-verydeep-16.mat') ;
+net = vl_simplenn_tidy(net) ;
+%% 读取图片 
+imageNumber = (length(dir('../datasets/CityCentre/'))-2)/2;
+featureVector = [];
+for i=1:2:2474
+%for i=1:2:2146
+    I = imread(['../datasets/CityCentre/',getName(i,4),'.jpg']);
+    im_ = single(I) ; % note: 255 range
+    im_ = imresize(im_, net.meta.normalization.imageSize(1:2)) ;
+    im_ = im_ - net.meta.normalization.averageImage ;
+    tic,res = vl_simplenn(net, im_) ;toc
+    feature_CNN = reshape(res(32).x,[1,25088]);
+     %resizedImg = imresize(I,[32 32],'nearest');
+     %tic,[feature_hog,] = extractHOGFeatures(resizedImg,'CellSize',[8,8]);toc
+    featureVector = [featureVector;feature_CNN];
+end
+%% PCA
+[coeff,score,latent] = pca(featureVector);
+feature_pca = score(:,1:1024);
+%% 计算距离矩阵
+differenceMatrix = [];
+for i=1:imageNumber
+    differenceVector = []; 
+    for j=1:imageNumber
+        feature1 = feature_pca(i,:);
+        feature2 = feature_pca(j,:);
+        %difference = norm(feature1-feature2);
+        difference = (feature1*feature2')/(norm(feature1)*norm(feature2));
+        differenceVector = [differenceVector,difference];
+    end
+    differenceMatrix = [differenceMatrix;differenceVector];
+end
+%% 归一化
+differenceMatrix = mapminmax(differenceMatrix,0,1);
+imagesc(differenceMatrix);
+colormap Hot
+colorbar
+%% 线性搜索
+loop = [];
+for i=1:imageNumber
+    maxTemp = 0;
+    max = [];
+    for j=1:imageNumber
+        if differenceMatrix(i,j)>0.6 && i-j>10 && differenceMatrix(i,j)>maxTemp
+            maxTemp = differenceMatrix(i,j);
+            max = [i,j];
+        end
+    end
+    loop = [loop;max];
+end
+%% 画图
+plot(loop(:,1),loop(:,2),'.');
